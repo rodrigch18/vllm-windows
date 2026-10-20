@@ -7,6 +7,7 @@
 #include "torch_utils.h"
 #include "dispatch_utils.h"
 #include "type_convert.cuh"
+#include "core/utils.hpp"
 #include "core/vec_dtypes/dtype_fp8.cuh"
 #include "quantization/w8a8/fp8/nvidia/quant_utils.cuh"
 
@@ -313,7 +314,7 @@ void launch_qknorm_rope_cache(
   const int block_size = static_cast<int>(k_cache.size(1));
   const int block_size_shift =
       (block_size & (block_size - 1)) == 0
-          ? __builtin_ctz(static_cast<unsigned int>(block_size))
+          ? ctz32(static_cast<uint32_t>(block_size))
           : -1;
 
 #define LAUNCH_QKNORM_ROPE_CACHE(HEAD_DIM, WIDE_192_ROTARY)                    \

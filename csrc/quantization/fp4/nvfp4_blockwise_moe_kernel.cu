@@ -38,6 +38,14 @@
 #include "cutlass/util/host_tensor.h"
 #include "cutlass/util/packed_stride.hpp"
 #include "cutlass/util/tensor_view_io.h"
+// The cutlass reference utilities below use the C `NAN` macro, which MSVC's
+// <cmath> does not reliably provide in this toolchain. Include <math.h> and,
+// if it is still absent here, fall back to defining NAN from <limits>.
+#include <math.h>
+#ifndef NAN
+#include <limits>
+#define NAN std::numeric_limits<double>::quiet_NaN()
+#endif
 #include "cutlass/util/reference/device/gemm.h"
 #include "cutlass/util/reference/device/tensor_compare.h"
 #include "cutlass/util/reference/host/tensor_fill.h"

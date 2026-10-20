@@ -1,0 +1,161 @@
+diff --git a/csrc/jit_kernels/heuristics/sm100.hpp b/csrc/jit_kernels/heuristics/sm100.hpp
+index c88f299..6c5145c 100644
+--- a/csrc/jit_kernels/heuristics/sm100.hpp
++++ b/csrc/jit_kernels/heuristics/sm100.hpp
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <algorithm>
++#include <numeric>
+ #include <cute/arch/mma_sm100_desc.hpp>
+ // Reuse some types in the JIT modules
+ #include <deep_gemm/common/types.cuh>
+diff --git a/csrc/jit_kernels/heuristics/sm90.hpp b/csrc/jit_kernels/heuristics/sm90.hpp
+index 3f62094..ad35a03 100644
+--- a/csrc/jit_kernels/heuristics/sm90.hpp
++++ b/csrc/jit_kernels/heuristics/sm90.hpp
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include <numeric>
+ #include <cute/arch/mma_sm100_desc.hpp>
+ // Reuse some types in the JIT modules
+ #include <deep_gemm/common/types.cuh>
+diff --git a/csrc/runtime/mlopart.hpp b/csrc/runtime/mlopart.hpp
+index eed54ff..721ff4c 100644
+--- a/csrc/runtime/mlopart.hpp
++++ b/csrc/runtime/mlopart.hpp
+@@ -1,6 +1,8 @@
+ #pragma once
+ 
++#ifndef _WIN32
+ #include <unistd.h>
++#endif
+ 
+ #include <initializer_list>
+ #include <string>
+@@ -116,7 +118,11 @@ static CUmemGenericAllocationHandle create_memory(const size_t& num_bytes, const
+     CUmemGenericAllocationHandle handle = 0;
+     DJ_CUDA_DRIVER_CHECK(deep_jit::cuda::driver::lazy_cuMemImportFromShareableHandle(
+         &handle, reinterpret_cast<void*>(static_cast<intptr_t>(fd)), CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR));
++#ifndef _WIN32
++    // POSIX file-descriptor IPC is only available on non-Windows platforms;
++    // the fd returned by the Python MLOPart backend is closed here.
+     close(fd);
++#endif
+     return handle;
+ }
+ 
+diff --git a/deep_gemm/_C.py b/deep_gemm/_C.py
+index 86dbcdc..790407c 100644
+--- a/deep_gemm/_C.py
++++ b/deep_gemm/_C.py
+@@ -29,9 +29,16 @@ def _unpack_epilogue(value):
+ 
+ 
+ def _load_extension():
+-    so_files = list(Path(__file__).parent.glob('_C_extension*.so'))
++    # The extension is built as _C_extension.abi3.so on POSIX and as a
++    # .pyd on Windows (with or without the abi3 suffix).
++    so_files = [
++        path
++        for pattern in ('_C_extension*.so', '_C_extension*.pyd')
++        for path in Path(__file__).parent.glob(pattern)
++    ]
+     assert len(so_files) == 1, (
+-        f'Expected one _C_extension*.so file, found {len(so_files)}: {so_files}'
++        f'Expected one _C_extension*.so/.pyd file, found {len(so_files)}: '
++        f'{so_files}'
+     )
+     torch.ops.load_library(str(so_files[0]))
+ 
+diff --git a/deep_gemm/include/deep_gemm/common/exception.cuh b/deep_gemm/include/deep_gemm/common/exception.cuh
+index 78acf74..c02d864 100644
+--- a/deep_gemm/include/deep_gemm/common/exception.cuh
++++ b/deep_gemm/include/deep_gemm/common/exception.cuh
+@@ -12,12 +12,26 @@ CUTLASS_HOST_DEVICE void host_device_printf(const char* format, ...) {
+ #define printf host_device_printf
+ #endif
+ 
++#ifndef DG_DEVICE_TRAP
++// `asm("trap;")` is not accepted by MSVC in host compilation; on Windows
++// device code uses the CUDA `__trap()` intrinsic instead.
++#ifdef _WIN32
++#ifdef __CUDACC__
++#define DG_DEVICE_TRAP() __trap()
++#else
++#define DG_DEVICE_TRAP() (void)0
++#endif
++#else
++#define DG_DEVICE_TRAP() asm("trap;")
++#endif
++#endif
++
+ #ifndef DG_DEVICE_ASSERT
+ #define DG_DEVICE_ASSERT(cond) \
+ do { \
+     if (not (cond)) { \
+         printf("Assertion failed: %s:%d, condition: %s\n", __FILE__, __LINE__, #cond); \
+-        asm("trap;"); \
++        DG_DEVICE_TRAP(); \
+     } \
+ } while (0)
+ #endif
+@@ -26,7 +40,7 @@ do { \
+ #define DG_TRAP_ONLY_DEVICE_ASSERT(cond) \
+ do { \
+     if (not (cond)) \
+-        asm("trap;"); \
++        DG_DEVICE_TRAP(); \
+ } while (0)
+ #endif
+ 
+diff --git a/setup.py b/setup.py
+index b92b2bb..7259387 100644
+--- a/setup.py
++++ b/setup.py
+@@ -24,12 +24,24 @@ DG_FORCE_BUILD = int(os.getenv('DG_FORCE_BUILD', '0')) == 1
+ DG_USE_LOCAL_VERSION = int(os.getenv('DG_USE_LOCAL_VERSION', '1')) == 1
+ 
+ # Compiler flags
+-cxx_flags = ['-std=c++20', '-O3', '-fPIC', '-Wno-psabi', '-Wno-deprecated-declarations',
+-             '-DPy_LIMITED_API=0x030a0000',
+-             f'-D_GLIBCXX_USE_CXX11_ABI={int(torch.compiled_with_cxx11_abi())}',
+-             '-DDJ_DISABLE_GIL=1',
+-             '-DTORCH_TARGET_VERSION=0x020b000000000000',
+-             '-DUSE_CUDA']
++if sys.platform == 'win32':
++    # MSVC does not accept the GCC-specific flags below; -Wno-psabi in
++    # particular is a hard error (D8021) for cl.exe. The dash-style
++    # -std=c++20 is silently ignored by cl (D9002), leaving it in C++14
++    # mode, so the slash form is required.
++    cxx_flags = ['/std:c++20', '/O2', '/Zc:preprocessor', '/DWIN32_LEAN_AND_MEAN', '/DNOMINMAX',
++                 '-DPy_LIMITED_API=0x030a0000',
++                 f'-D_GLIBCXX_USE_CXX11_ABI={int(torch.compiled_with_cxx11_abi())}',
++                 '-DDJ_DISABLE_GIL=1',
++                 '-DTORCH_TARGET_VERSION=0x020b000000000000',
++                 '-DUSE_CUDA']
++else:
++    cxx_flags = ['-std=c++20', '-O3', '-fPIC', '-Wno-psabi', '-Wno-deprecated-declarations',
++                 '-DPy_LIMITED_API=0x030a0000',
++                 f'-D_GLIBCXX_USE_CXX11_ABI={int(torch.compiled_with_cxx11_abi())}',
++                 '-DDJ_DISABLE_GIL=1',
++                 '-DTORCH_TARGET_VERSION=0x020b000000000000',
++                 '-DUSE_CUDA']
+ 
+ # Sources
+ current_dir = os.path.dirname(os.path.realpath(__file__))
+@@ -42,7 +54,12 @@ build_include_dirs = [
+     'third-party/cutlass/include',
+ ]
+ build_libraries = ['cudart']
+-build_library_dirs = [f'{CUDA_HOME}/lib64']
++if sys.platform == 'win32':
++    build_library_dirs = [f'{CUDA_HOME}/lib/x64']
++    # python_api.cpp uses cuBLASLt host-side heuristics directly
++    build_libraries += ['cublas', 'cublasLt']
++else:
++    build_library_dirs = [f'{CUDA_HOME}/lib64']
+ third_party_include_dirs = [
+     'third-party/cutlass/include/cute',
+     'third-party/cutlass/include/cutlass',

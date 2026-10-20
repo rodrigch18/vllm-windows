@@ -60,6 +60,58 @@ else()
     )
   endif()
   message(STATUS "DeepGEMM is available at ${deepgemm_SOURCE_DIR}")
+  
+  if(WIN32)
+    # Windows port patches, applied on top of the pristine upstream source:
+    #   - windows_cutlass_memory_sm75.patch: CUTLASS memory layout for sm_75
+    #   - windows_deepgemm.patch: MSVC-friendly cxx_flags in setup.py plus
+    #     Windows guards in the deep_gemm headers (device asm, ...)
+    #   - windows_deepgemm_deep_jit.patch: platform guards in the deep_jit
+    #     headers (dlfcn/LoadLibrary, unistd, __VA_OPT__, fs::path, ...)
+    find_package(Git REQUIRED)
+
+    # Patch file / target dir pairs (semicolon is the CMake list separator,
+    # so these are two parallel lists).
+    set(_dg_win_patch_files
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/windows_cutlass_memory_sm75.patch"
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/windows_deepgemm.patch"
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/windows_deepgemm_deep_jit.patch")
+    set(_dg_win_patch_dirs
+      "${deepgemm_SOURCE_DIR}/third-party/cutlass"
+      "${deepgemm_SOURCE_DIR}"
+      "${deepgemm_SOURCE_DIR}/third-party/deep_jit")
+
+    list(LENGTH _dg_win_patch_files _dg_win_n_patches)
+    set(_dg_win_i 0)
+    while(_dg_win_i LESS ${_dg_win_n_patches})
+      list(GET _dg_win_patch_files ${_dg_win_i} _dg_patch_file)
+      list(GET _dg_win_patch_dirs ${_dg_win_i} _dg_patch_dir)
+
+      # If the patch reverses cleanly, it's already applied.
+      execute_process(
+        COMMAND "${GIT_EXECUTABLE}" apply --reverse --check --ignore-whitespace
+                "${_dg_patch_file}"
+        WORKING_DIRECTORY "${_dg_patch_dir}"
+        RESULT_VARIABLE _dg_patch_already
+        OUTPUT_QUIET ERROR_QUIET)
+
+      if(NOT _dg_patch_already EQUAL 0)
+        execute_process(
+          COMMAND "${GIT_EXECUTABLE}" apply --ignore-whitespace
+                  "${_dg_patch_file}"
+          WORKING_DIRECTORY "${_dg_patch_dir}"
+          RESULT_VARIABLE _dg_patch_rc
+          ERROR_VARIABLE _dg_patch_err)
+        if(NOT _dg_patch_rc EQUAL 0)
+          message(FATAL_ERROR
+            "Failed to apply ${_dg_patch_file} to ${_dg_patch_dir}:\n"
+            "${_dg_patch_err}")
+        endif()
+        message(STATUS "Applied ${_dg_patch_file} to ${_dg_patch_dir}")
+      endif()
+      math(EXPR _dg_win_i "${_dg_win_i} + 1")
+    endwhile()
+  endif()
 endif()
 
 # DeepGEMM requires CUDA 12.3+ for SM90, 12.9+ for SM100 (official upstream),
@@ -139,7 +191,8 @@ if(DEEPGEMM_ARCHS)
     COMPONENT _deep_gemm_C
     FILES_MATCHING
       PATTERN "_C.py"
-      PATTERN "_C_extension*.so")
+      PATTERN "_C_extension*.so"
+      PATTERN "_C*.pyd")
 
   #
   # Vendor DeepGEMM Python package files

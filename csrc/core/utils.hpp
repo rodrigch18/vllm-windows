@@ -3,10 +3,33 @@
 #include <climits>
 #include <cstdint>
 #include <cstdlib>
+#ifdef _WIN32
+#include <bit>
+#endif
 
 inline constexpr uint32_t next_pow_2(uint32_t const num) {
   if (num <= 1) return num;
+#ifdef _WIN32
+  return 1 << (CHAR_BIT * sizeof(num) - __lzcnt(num - 1));
+#else
   return 1 << (CHAR_BIT * sizeof(num) - __builtin_clz(num - 1));
+#endif
+}
+
+inline constexpr uint32_t clz32(uint32_t const num) {
+#ifdef _WIN32
+  return static_cast<uint32_t>(std::countl_zero(num));
+#else
+  return __builtin_clz(num);
+#endif
+}
+
+inline constexpr uint32_t ctz32(uint32_t const num) {
+#ifdef _WIN32
+  return static_cast<uint32_t>(std::countr_zero(num));
+#else
+  return __builtin_ctz(num);
+#endif
 }
 
 template <typename A, typename B>
