@@ -4,15 +4,23 @@
 numba == 0.65.0 # Required for N-gram speculative decoding
 
 # Dependencies for NVIDIA GPUs
-torch==2.14.0
-torchaudio==2.11.0
+torch==2.14.0; sys_platform != "win32"
+torchaudio==2.11.0; sys_platform != "win32"
+torch==2.14.1+cu132; sys_platform == "win32"
+torchaudio==2.11.0; sys_platform == "win32"
 # These must be updated alongside torch
-torchvision==0.29.0 # Required for phi3v processor. See https://github.com/pytorch/vision?tab=readme-ov-file#installation for corresponding version
+torchvision==0.29.0; sys_platform != "win32" # Required for phi3v processor. See https://github.com/pytorch/vision?tab=readme-ov-file#installation for corresponding version
+torchvision==0.29.1+cu132; sys_platform == "win32"
 torchcodec >= 0.14
 PyNvVideoCodec==2.0.4
-flashinfer-python==0.7.3
-apache-tvm-ffi==0.1.11
-tilelang==0.1.12
+flashinfer-python==0.7.3; sys_platform != "win32"
+# Windows: install the flashinfer-windows build of this exact version first
+# (github.com/rodrigch18/flashinfer-windows); the PyPI wheel
+# lacks the MSVC JIT patches.
+flashinfer-python==0.7.3; sys_platform == "win32"
+apache-tvm-ffi==0.1.11; sys_platform != "win32"
+apache-tvm-ffi>=0.1.13,<0.2; sys_platform == "win32" # apache-tvm-ffi>=0.1.13 fixes xgrammar > 0.25 xgrammar_bindings.dll load error
+tilelang==0.1.12; sys_platform != "win32" # excluded on windows to avoid conflicting dependencies as apache-tvm-ffi>=0.1.13 is required and tilelang requires <0.1.13
 # >=1.31.0 keeps execution plans alive for the CUDA graphs recorded from them
 # (NVIDIA/cudnn-frontend#1195); older versions can replay an unloaded kernel.
 nvidia-cudnn-frontend>=1.31.0
@@ -20,10 +28,11 @@ nvidia-cudnn-frontend>=1.31.0
 nvtx==0.2.15
 # Required for faster safetensors model loading
 fastsafetensors >= 0.3.3
-instanttensor >= 0.2.2
+instanttensor >= 0.2.2; sys_platform != "win32"
 
 # QuACK and Cutlass DSL for FA4 (cute-DSL implementation)
-nvidia-cutlass-dsl[cu13]==4.8.0
+nvidia-cutlass-dsl[cu13]==4.8.0; sys_platform != "win32"
+nvidia-cutlass-dsl[cu13]>=4.8.0; sys_platform == "win32"
 quack-kernels==0.6.5  # Required by MSA
 
 # Tokenspeed_MLA for faster mla with spec decode

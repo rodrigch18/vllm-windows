@@ -35,6 +35,7 @@
 
 #include "core/cuda_compat.h"
 #include "fused_muse_spark_qknorm_rope_kv_insert_entry.h"
+#include "core/utils.hpp"
 #include "type_convert.cuh"
 #include "core/vec_dtypes/dtype_fp8.cuh"
 #include "dispatch_utils.h"
@@ -95,7 +96,7 @@ inline FastDiv makeFastDiv(int denom) {
   // device side selects on. Dividends stay below 2^31, which covers every slot
   // index this kernel can form.
   if (denom <= 1) return FastDiv{0u, 0u, 1};
-  int lg = 31 - __builtin_clz(denom);
+  int lg = 31 - clz32(static_cast<uint32_t>(denom));
   if ((1 << lg) < denom) lg++;
   uint32_t const p = 31 + static_cast<uint32_t>(lg);
   uint64_t const m = ((1ull << p) + static_cast<uint64_t>(denom) - 1) /

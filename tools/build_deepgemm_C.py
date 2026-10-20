@@ -45,10 +45,20 @@ subprocess.check_call(
 shim = _pkg / "_C.py"
 shutil.copy2(shim, out / shim.name)
 
-so = _pkg / "_C_extension.abi3.so"
-if not so.is_file():
-    sys.exit(f"DeepGEMM build did not produce {so}")
-for stale in out.glob("_C_extension*.so"):
+# The stable-ABI extension is built as _C_extension.abi3.so on POSIX and
+# _C_extension.abi3.PYD on Windows; without the abi3 suffix the build
+# falls back to plain _C_extension.so / _C_extension.pyd.
+for pattern in ("_C_extension.abi3.*", "_C_extension.*"):
+    candidates = [
+        c for c in _pkg.glob(pattern)
+        if c.suffix.lower() in (".so", ".pyd")
+    ]
+    if candidates:
+        break
+if not candidates:
+    sys.exit(f"DeepGEMM build did not produce _C_extension.* in {_pkg}")
+so = candidates[0]
+for stale in out.glob("_C_extension*"):
     stale.unlink()
 shutil.copy2(so, out / so.name)
 print(f"[build_deepgemm_C] installed {so.name} -> {out}", flush=True)

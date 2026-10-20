@@ -9,6 +9,7 @@ from __future__ import annotations
 import ctypes
 import glob
 import os
+import sys
 from collections.abc import Iterable
 from contextlib import suppress
 from functools import cache
@@ -261,7 +262,10 @@ class VmmDriver:
 
 class CudaVmmDriver(VmmDriver):
     dlpack_device_type = 2  # kDLCUDA
-    _lib_candidates = ("libcuda.so.1", "libcuda.so")
+    # Windows Fix: the CUDA driver API (cuMem*) lives in nvcuda.dll.
+    _lib_candidates = (
+        ("nvcuda.dll",) if sys.platform == "win32" else ("libcuda.so.1", "libcuda.so")
+    )
     _lib_search_name = "libcuda"
     _symbols = {
         "get_granularity": "cuMemGetAllocationGranularity",

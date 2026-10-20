@@ -365,11 +365,18 @@ def kernel_warmup(worker: "Worker", *, process_local_only: bool = False):
 
     if current_platform.is_cuda():
         # The MSA kernels, and the CuTe DSL their modules import, are CUDA-only.
-        from vllm.model_executor.warmup.minimax_m3_msa_warmup import (
-            minimax_m3_msa_warmup,
-        )
-
-        minimax_m3_msa_warmup(worker)
+        try:
+            from vllm.model_executor.warmup.minimax_m3_msa_warmup import (
+                minimax_m3_msa_warmup,
+            )
+        except ImportError:
+            # Windows: the MSA kernels import quack-kernels, which needs fcntl
+            # (POSIX-only), so MiniMax-M3 MSA is unavailable there; this warmup
+            # runs for every model, so skip it instead of failing startup.
+            if sys.platform != "win32":
+                raise
+        else:
+            minimax_m3_msa_warmup(worker)
 
     # Allocate the exact decode-sized workspace, autotune cache misses, and
     # resolve every CUDA Graph bucket before capture begins.
