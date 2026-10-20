@@ -1,0 +1,84 @@
+diff --git a/deep_gemm/include/deep_gemm/common/exception.cuh b/deep_gemm/include/deep_gemm/common/exception.cuh
+index 78acf74..c02d864 100644
+--- a/deep_gemm/include/deep_gemm/common/exception.cuh
++++ b/deep_gemm/include/deep_gemm/common/exception.cuh
+@@ -12,12 +12,26 @@ CUTLASS_HOST_DEVICE void host_device_printf(const char* format, ...) {
+ #define printf host_device_printf
+ #endif
+ 
++#ifndef DG_DEVICE_TRAP
++// `asm("trap;")` is not accepted by MSVC in host compilation; on Windows
++// device code uses the CUDA `__trap()` intrinsic instead.
++#ifdef _WIN32
++#ifdef __CUDACC__
++#define DG_DEVICE_TRAP() __trap()
++#else
++#define DG_DEVICE_TRAP() (void)0
++#endif
++#else
++#define DG_DEVICE_TRAP() asm("trap;")
++#endif
++#endif
++
+ #ifndef DG_DEVICE_ASSERT
+ #define DG_DEVICE_ASSERT(cond) \
+ do { \
+     if (not (cond)) { \
+         printf("Assertion failed: %s:%d, condition: %s\n", __FILE__, __LINE__, #cond); \
+-        asm("trap;"); \
++        DG_DEVICE_TRAP(); \
+     } \
+ } while (0)
+ #endif
+@@ -26,7 +40,7 @@ do { \
+ #define DG_TRAP_ONLY_DEVICE_ASSERT(cond) \
+ do { \
+     if (not (cond)) \
+-        asm("trap;"); \
++        DG_DEVICE_TRAP(); \
+ } while (0)
+ #endif
+ 
+diff --git a/setup.py b/setup.py
+index ea81a97..49166af 100644
+--- a/setup.py
++++ b/setup.py
+@@ -24,10 +24,20 @@ DG_FORCE_BUILD = int(os.getenv('DG_FORCE_BUILD', '0')) == 1
+ DG_USE_LOCAL_VERSION = int(os.getenv('DG_USE_LOCAL_VERSION', '1')) == 1
+ 
+ # Compiler flags
+-cxx_flags = ['-std=c++20', '-O3', '-fPIC', '-Wno-psabi', '-Wno-deprecated-declarations',
+-             '-DPy_LIMITED_API=0x030a0000',
+-             '-DDJ_DISABLE_GIL=1',
+-             f'-D_GLIBCXX_USE_CXX11_ABI={int(torch.compiled_with_cxx11_abi())}']
++if sys.platform == 'win32':
++    # MSVC does not accept the GCC-specific flags below; -Wno-psabi in
++    # particular is a hard error (D8021) for cl.exe. The dash-style
++    # -std=c++20 is silently ignored by cl (D9002), leaving it in C++14
++    # mode, so the slash form is required.
++    cxx_flags = ['/std:c++20', '/O2', '/Zc:preprocessor', '/DWIN32_LEAN_AND_MEAN', '/DNOMINMAX',
++                 '-DPy_LIMITED_API=0x030a0000',
++                 '-DDJ_DISABLE_GIL=1',
++                 f'-D_GLIBCXX_USE_CXX11_ABI={int(torch.compiled_with_cxx11_abi())}']
++else:
++    cxx_flags = ['-std=c++20', '-O3', '-fPIC', '-Wno-psabi', '-Wno-deprecated-declarations',
++                 '-DPy_LIMITED_API=0x030a0000',
++                 '-DDJ_DISABLE_GIL=1',
++                 f'-D_GLIBCXX_USE_CXX11_ABI={int(torch.compiled_with_cxx11_abi())}']
+ 
+ # Sources
+ current_dir = os.path.dirname(os.path.realpath(__file__))
+@@ -40,7 +50,12 @@ build_include_dirs = [
+     'third-party/cutlass/include',
+ ]
+ build_libraries = ['cudart']
+-build_library_dirs = [f'{CUDA_HOME}/lib64']
++if sys.platform == 'win32':
++    build_library_dirs = [f'{CUDA_HOME}/lib/x64']
++    # python_api.cpp uses cuBLASLt host-side heuristics directly
++    build_libraries += ['cublas', 'cublasLt']
++else:
++    build_library_dirs = [f'{CUDA_HOME}/lib64']
+ third_party_include_dirs = [
+     'third-party/cutlass/include/cute',
+     'third-party/cutlass/include/cutlass',

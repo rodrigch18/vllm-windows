@@ -1,0 +1,4 @@
+winloop
+triton-windows==3.7.1.post27
+xformers==0.0.35
+portalocker
