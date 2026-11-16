@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vLLM for Windows: run vLLM natively on Windows without WSL</title>
+<meta name="description" content="Install and run vLLM natively on Windows 10/11 without WSL or Docker. Prebuilt CUDA 13 wheels for Python 3.12 and 3.14 (RTX 50 series) and build-from-source instructions for other NVIDIA GPUs.">
+<link rel="canonical" href="https://rodrigch18.github.io/vllm-windows/">
+<meta name="robots" content="index, follow">
+<!-- Google Search Console: paste the verification tag here, e.g.
+<meta name="google-site-verification" content="TOKEN"> -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="vLLM for Windows: run vLLM natively on Windows without WSL">
+<meta property="og:description" content="Prebuilt vLLM wheels for native Windows (CUDA 13, Python 3.12/3.14), plus build-from-source instructions.">
+<meta property="og:url" content="https://rodrigch18.github.io/vllm-windows/">
+<meta name="twitter:card" content="summary">
+<meta name="color-scheme" content="light dark">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "vLLM for Windows",
+  "description": "Native Windows (x64, MSVC, CUDA 13) port of the vLLM LLM inference and serving engine, without WSL.",
+  "codeRepository": "https://github.com/rodrigch18/vllm-windows",
+  "programmingLanguage": ["Python", "C++", "CUDA"],
+  "runtimePlatform": "Windows x64",
+  "license": "https://www.apache.org/licenses/LICENSE-2.0",
+  "version": "0.33.0"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Can vLLM run on Windows without WSL?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Yes. Upstream vLLM supports Linux only, so on Windows it normally runs inside WSL2. vLLM for Windows is a native Windows build (MSVC + CUDA 13) that installs with pip and runs directly on Windows 10/11, without WSL or Docker."}},
+    {"@type": "Question", "name": "Which NVIDIA GPUs are supported?",
+     "acceptedAnswer": {"@type": "Answer", "text": "The prebuilt wheels target RTX 50 series (Blackwell, compute capability 12.0). For other NVIDIA GPUs such as RTX 30 or RTX 40 series, build the wheel from source with your GPU architecture."}},
+    {"@type": "Question", "name": "Which Python versions are supported?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Prebuilt wheels are available for CPython 3.12 and 3.14 on Windows x64."}},
+    {"@type": "Question", "name": "Is this an official vLLM project?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No. It is a community fork of vllm-project/vllm and is not affiliated with or endorsed by the vLLM project. Each release is the upstream release tag plus one reviewable Windows commit."}}
+  ]
+}
+</script>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --card: #f6f8fa; --border: #d1d9e0;
+  --accent: #0969da; --accent-fg: #ffffff; --code-bg: #0d1117; --code-fg: #e6edf3;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --card: #151b23; --border: #3d444d;
+    --accent: #4493f8; --accent-fg: #0d1117; --code-bg: #010409; --code-fg: #e6edf3;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+main, header, footer { max-width: 880px; margin: 0 auto; padding: 0 16px; }
+header { padding-top: 56px; padding-bottom: 24px; }
+h1 { font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.15; margin: 0 0 12px; }
+h2 { font-size: 1.5rem; margin: 48px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.1rem; margin: 24px 0 8px; }
+.lead { font-size: 1.2rem; color: var(--muted); margin: 0 0 24px; }
+a { color: var(--accent); }
+.buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn { display: inline-block; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600;
+  border: 1px solid var(--border); color: var(--fg); background: var(--card); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.card b { display: block; font-size: 1.05rem; }
+.card span { color: var(--muted); font-size: 0.9rem; }
+pre { position: relative; background: var(--code-bg); color: var(--code-fg); padding: 16px; border-radius: 10px;
+  overflow-x: auto; font-size: 0.85rem; line-height: 1.5; }
+code { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+p code, li code, td code { background: var(--card); border: 1px solid var(--border); padding: 1px 5px; border-radius: 5px; font-size: 0.88em; }
+.copy { position: absolute; top: 8px; right: 8px; font: 600 12px/1 inherit; padding: 6px 10px; border-radius: 6px;
+  border: 1px solid #3d444d; background: #151b23; color: #e6edf3; cursor: pointer; }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+th { background: var(--card); }
+details { border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 10px 0; background: var(--card); }
+summary { font-weight: 600; cursor: pointer; }
+.tabs { display: flex; gap: 8px; margin: 8px 0 -4px; }
+.tab { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--fg);
+  cursor: pointer; font: inherit; font-size: 0.9rem; }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.note { color: var(--muted); font-size: 0.92rem; }
+footer { margin-top: 64px; padding-top: 16px; padding-bottom: 40px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>vLLM for Windows</h1>
+  <p class="lead">Run vLLM natively on Windows 10/11, without WSL or Docker. A native MSVC + CUDA 13 build of the
+    <a href="https://github.com/vllm-project/vllm">vLLM</a> inference and serving engine, with prebuilt wheels and an
+    OpenAI-compatible server.</p>
+  <div class="buttons">
+    <a class="btn primary" href="https://github.com/rodrigch18/vllm-windows/releases/latest">Download wheels</a>
+    <a class="btn" href="#install">Install guide</a>
+    <a class="btn" href="https://github.com/rodrigch18/vllm-windows">GitHub repository</a>
+  </div>
+  <div class="grid">
+    <div class="card"><b>vLLM 0.33.0</b><span>latest stable upstream release</span></div>
+    <div class="card"><b>Python 3.12 &amp; 3.14</b><span>prebuilt wheels, Windows x64</span></div>
+    <div class="card"><b>CUDA 13</b><span>torch 2.14.1 (cu132), toolkits up to 13.5</span></div>
+    <div class="card"><b>RTX 50 series</b><span>prebuilt; other GPUs build from source</span></div>
+  </div>
+</header>
+
+<main>
+<h2 id="requirements">Requirements</h2>
+<ul>
+  <li>Windows 10 or 11, x64, with an NVIDIA driver that supports CUDA 13.</li>
+  <li>For the prebuilt wheels: an NVIDIA RTX 50 series GPU (Blackwell, compute capability 12.0) and CPython 3.12 or 3.14.
+    Other GPUs: <a href="https://github.com/rodrigch18/vllm-windows/tree/vllm-for-windows#building-from-source">build from source</a>.</li>
+  <li><a href="https://visualstudio.microsoft.com/downloads/">Visual Studio Build Tools</a> (C++ workload) and a
+    <a href="https://developer.nvidia.com/cuda-downloads">CUDA 13 toolkit</a>. FlashInfer compiles some kernels on first use, so
+    vLLM needs the compiler even with the prebuilt wheels. Patch the toolkit's <code>cuda.h</code> once with
+    <a href="https://github.com/rodrigch18/vllm-windows/blob/vllm-for-windows/fix_cuda_13_align.py"><code>fix_cuda_13_align.py</code></a>
+    (see the <a href="https://github.com/rodrigch18/vllm-windows/tree/vllm-for-windows#building-from-source">README</a>).</li>
+</ul>
+
+<h2 id="install">Install</h2>
+<p>Create a virtual environment, then install in this order: PyTorch, the Windows FlashInfer wheels, then vLLM.
+  The order matters: otherwise pip pulls the Linux-only FlashInfer package from PyPI.</p>
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-py="312">Python 3.12</button>
+  <button class="tab" role="tab" aria-selected="false" data-py="314">Python 3.14</button>
+</div>
+<pre><code id="install-cmd"></code><button class="copy" type="button">Copy</button></pre>
+<p class="note">Wheels and SHA256 checksums: <a href="https://github.com/rodrigch18/vllm-windows/releases/latest">vLLM release</a>,
+  <a href="https://github.com/rodrigch18/flashinfer-windows/releases/latest">FlashInfer for Windows release</a>.</p>
+
+<h2 id="run">Run a server</h2>
+<p>Open a command prompt with the MSVC x64 environment and CUDA on <code>PATH</code> (needed the first time, while kernels are
+  compiled and cached), activate the venv and start the OpenAI-compatible server:</p>
+<pre><code>"%VISUAL_STUDIO_INSTALL_PATH%\VC\Auxiliary\Build\vcvarsall.bat" x64
+set "PATH=%CUDA_PATH%\bin;%PATH%"
+.venv\Scripts\activate
+vllm serve YOUR_MODEL --host 127.0.0.1 --port 8000</code><button class="copy" type="button">Copy</button></pre>
+<p>Then point any OpenAI-compatible client at <code>http://127.0.0.1:8000/v1</code>.</p>
+
+<h2 id="why">Why this fork</h2>
+<table>
+  <tr><th></th><th>Windows support</th></tr>
+  <tr><td><a href="https://github.com/vllm-project/vllm">vllm-project/vllm</a> (upstream)</td><td>Linux only; on Windows through WSL2.</td></tr>
+  <tr><td><a href="https://github.com/SystemPanic/vllm-windows">SystemPanic/vllm-windows</a></td><td>The original native Windows port, which this fork builds on. Also covers ARM64.</td></tr>
+  <tr><td><strong>rodrigch18/vllm-windows</strong></td><td>Latest stable vLLM with the dependency versions upstream pins (PyTorch 2.14, FlashInfer 0.7.2.post1), CUDA 13 up to 13.5, Python 3.12 and 3.14 wheels.</td></tr>
+</table>
+<ul>
+  <li><strong>Reviewable:</strong> each release is the upstream release tag plus exactly one squashed Windows commit, so every Windows change is in a
+    <a href="https://github.com/vllm-project/vllm/compare/v0.33.0...rodrigch18:vllm-windows:vllm-for-windows">single diff</a>.</li>
+  <li><strong>Companion FlashInfer build:</strong> <a href="https://github.com/rodrigch18/flashinfer-windows">rodrigch18/flashinfer-windows</a>,
+    maintained the same way, with precompiled kernels for RTX 50 series.</li>
+  <li><strong>No admin rights needed at runtime:</strong> kernel JIT works without symlink privileges or Developer Mode and stays under the 260-character path limit.</li>
+</ul>
+
+<h2 id="faq">FAQ</h2>
+<details><summary>Can vLLM run on Windows without WSL?</summary>
+  <p>Yes. Upstream vLLM supports Linux only, so on Windows it normally runs inside WSL2. This fork is a native Windows build
+  (MSVC + CUDA 13) that installs with pip and runs directly on Windows 10/11.</p></details>
+<details><summary>Does it work on RTX 30 or RTX 40 series GPUs?</summary>
+  <p>The prebuilt wheels target RTX 50 series only. For other NVIDIA GPUs,
+  <a href="https://github.com/rodrigch18/vllm-windows/tree/vllm-for-windows#building-from-source">build the wheel from source</a>
+  and set <code>TORCH_CUDA_ARCH_LIST</code> to your GPU (for example <code>8.6</code> for RTX 30, <code>8.9</code> for RTX 40).</p></details>
+<details><summary>Why do I need Visual Studio Build Tools and the CUDA toolkit to run it?</summary>
+  <p>Some FlashInfer and DeepGEMM kernels are compiled the first time they are used (JIT) and then cached, which needs nvcc and the MSVC compiler.</p></details>
+<details><summary>Does multi-GPU (tensor / pipeline parallel) work?</summary>
+  <p>Yes, with a Windows build of NCCL. See the
+  <a href="https://github.com/rodrigch18/vllm-windows/tree/vllm-for-windows#vllm-for-windows">README</a>.</p></details>
+<details><summary>Is this an official vLLM project?</summary>
+  <p>No. It is a community fork and is not affiliated with or endorsed by the vLLM project. Report Windows-specific problems in
+  <a href="https://github.com/rodrigch18/vllm-windows/issues">this fork's issues</a>, and general vLLM questions upstream.</p></details>
+</main>
+
+<footer>
+  vLLM for Windows is a community fork of <a href="https://github.com/vllm-project/vllm">vllm-project/vllm</a>
+  (Apache-2.0), not affiliated with the vLLM project. ·
+  <a href="https://github.com/rodrigch18/vllm-windows">Source</a> ·
+  <a href="https://github.com/rodrigch18/vllm-windows/discussions">Discussions</a> ·
+  <a href="https://github.com/rodrigch18/vllm-windows/issues">Issues</a>
+</footer>
+
+<script>
+// Install commands; update VLLM / FI versions on each release.
+const VLLM = "0.33.0", VLLM_LOCAL = "cu135", FI = "0.7.2.post1";
+const VREL = "https://github.com/rodrigch18/vllm-windows/releases/download/v" + VLLM + "/";
+const FREL = "https://github.com/rodrigch18/flashinfer-windows/releases/download/v" + FI + "/";
+function cmd(py) {
+  return [
+    "py -" + py.slice(0, 1) + "." + py.slice(1) + " -m venv .venv",
+    ".venv\\Scripts\\activate",
+    "pip install torch==2.14.1 torchvision==0.29.1 --index-url https://download.pytorch.org/whl/cu132",
+    "pip install " + FREL + "flashinfer_python-" + FI + "-py3-none-any.whl ^",
+    "  " + FREL + "flashinfer_jit_cache_sm120f-" + FI + "-cp39-abi3-win_amd64.whl ^",
+    "  " + FREL + "flashinfer_jit_cache-" + FI + "-cp39-abi3-win_amd64.whl ^",
+    "  flashinfer-cubin==" + FI + " --extra-index-url https://flashinfer.ai/whl/",
+    "pip install " + VREL + "vllm-" + VLLM + "%2B" + VLLM_LOCAL + "-cp" + py + "-cp" + py + "-win_amd64.whl ^",
+    "  --extra-index-url https://download.pytorch.org/whl/cu132"
+  ].join("\n");
+}
+const out = document.getElementById("install-cmd");
+function show(py) {
+  out.textContent = cmd(py);
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.py === py));
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => show(t.dataset.py)));
+show("312");
+document.querySelectorAll(".copy").forEach(b => b.addEventListener("click", async () => {
+  const text = b.parentElement.querySelector("code").textContent;
+  try { await navigator.clipboard.writeText(text); b.textContent = "Copied"; }
+  catch (e) { b.textContent = "Select & copy"; }
+  setTimeout(() => (b.textContent = "Copy"), 1500);
+}));
+</script>
+<noscript><p style="max-width:880px;margin:0 auto;padding:0 16px">Install commands need JavaScript; see the
+  <a href="https://github.com/rodrigch18/vllm-windows/releases/latest">release notes</a> instead.</p></noscript>
+</body>
+</html>
