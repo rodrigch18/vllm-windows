@@ -25,7 +25,7 @@
   "programmingLanguage": ["Python", "C++", "CUDA"],
   "runtimePlatform": "Windows x64",
   "license": "https://www.apache.org/licenses/LICENSE-2.0",
-  "version": "0.33.0"
+  "version": "0.34.0"
 }
 </script>
 <script type="application/ld+json">
@@ -104,7 +104,7 @@ footer { margin-top: 64px; padding-top: 16px; padding-bottom: 40px; border-top: 
     <a class="btn" href="https://github.com/rodrigch18/vllm-windows">GitHub repository</a>
   </div>
   <div class="grid">
-    <div class="card"><b>vLLM 0.33.0</b><span>latest stable upstream release</span></div>
+    <div class="card"><b>vLLM 0.34.0</b><span>latest stable upstream release</span></div>
     <div class="card"><b>Python 3.12 &amp; 3.14</b><span>prebuilt wheels, Windows x64</span></div>
     <div class="card"><b>CUDA 13</b><span>torch 2.14.1 (cu132), toolkits up to 13.5</span></div>
     <div class="card"><b>RTX 50 series</b><span>prebuilt; other GPUs build from source</span></div>
@@ -149,11 +149,11 @@ vllm serve YOUR_MODEL --host 127.0.0.1 --port 8000</code><button class="copy" ty
   <tr><th></th><th>Windows support</th></tr>
   <tr><td><a href="https://github.com/vllm-project/vllm">vllm-project/vllm</a> (upstream)</td><td>Linux only; on Windows through WSL2.</td></tr>
   <tr><td><a href="https://github.com/SystemPanic/vllm-windows">SystemPanic/vllm-windows</a></td><td>The original native Windows port, which this fork builds on. Also covers ARM64.</td></tr>
-  <tr><td><strong>rodrigch18/vllm-windows</strong></td><td>Latest stable vLLM with the dependency versions upstream pins (PyTorch 2.14, FlashInfer 0.7.2.post1), CUDA 13 up to 13.5, Python 3.12 and 3.14 wheels.</td></tr>
+  <tr><td><strong>rodrigch18/vllm-windows</strong></td><td>Latest stable vLLM with the dependency versions upstream pins (PyTorch 2.14, FlashInfer 0.7.3), CUDA 13 up to 13.5, Python 3.12 and 3.14 wheels.</td></tr>
 </table>
 <ul>
   <li><strong>Reviewable:</strong> each release is the upstream release tag plus exactly one squashed Windows commit, so every Windows change is in a
-    <a href="https://github.com/vllm-project/vllm/compare/v0.33.0...rodrigch18:vllm-windows:vllm-for-windows">single diff</a>.</li>
+    <a href="https://github.com/vllm-project/vllm/compare/v0.34.0...rodrigch18:vllm-windows:vllm-for-windows">single diff</a>.</li>
   <li><strong>Companion FlashInfer build:</strong> <a href="https://rodrigch18.github.io/flashinfer-windows/">FlashInfer for Windows</a>
     (<a href="https://github.com/rodrigch18/flashinfer-windows">repository</a>), maintained the same way, with precompiled kernels for RTX 50 series.</li>
   <li><strong>No admin rights needed at runtime:</strong> kernel JIT works without symlink privileges or Developer Mode and stays under the 260-character path limit.</li>
@@ -188,7 +188,7 @@ vllm serve YOUR_MODEL --host 127.0.0.1 --port 8000</code><button class="copy" ty
 
 <script>
 // Install commands; update VLLM / FI versions on each release.
-const VLLM = "0.33.0", VLLM_LOCAL = "cu135", FI = "0.7.2.post1";
+const VLLM = "0.34.0", VLLM_LOCAL = "cu135", FI = "0.7.3";
 const VREL = "https://github.com/rodrigch18/vllm-windows/releases/download/v" + VLLM + "/";
 const FREL = "https://github.com/rodrigch18/flashinfer-windows/releases/download/v" + FI + "/";
 function cmd(py) {
